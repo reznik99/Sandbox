@@ -4,15 +4,25 @@ A secure Podman container for running untrusted scripts.
 
 ## Included tools
 
-| Tool       | Package            |
-| ---------- | ------------------ |
-| Node.js 24 | nodejs24, nodejs24-npm |
-| Go         | golang             |
-| SSH        | openssh-clients    |
-| Git        | git                |
-| fzf        | fzf                |
-| lsd        | lsd                |
-| GPG        | gnupg2             |
+| Tool           | Package                |
+| -------------- | ---------------------- |
+| Node.js 24     | nodejs24, nodejs24-npm |
+| Go             | golang                 |
+| GCC/G++        | gcc, gcc-c++           |
+| Make           | make                   |
+| Git            | git                    |
+| SSH            | openssh-clients        |
+| GPG            | gnupg2                 |
+| OpenSSL        | openssl                |
+| curl           | curl                   |
+| wget           | wget                   |
+| Vim            | vim                    |
+| fzf            | fzf                    |
+| lsd            | lsd                    |
+| ripgrep        | ripgrep                |
+| find           | findutils              |
+| ps/top         | procps-ng              |
+| Claude Code    | claude.ai/install.sh   |
 
 ## Build the image
 
