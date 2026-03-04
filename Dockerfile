@@ -32,7 +32,7 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # Set Go paths inside the container
 ENV GOPATH=/home/sandbox/go
-ENV PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
+ENV PATH=$PATH:$GOPATH/bin
 # Ensure the Claude binary is in the PATH
 ENV PATH="/home/sandbox/.local/bin:${PATH}"
 
