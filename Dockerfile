@@ -15,7 +15,10 @@ RUN dnf upgrade -y --refresh && \
         openssl curl wget vim findutils procps-ng ripgrep \
         && \
     dnf clean all && \
-    rm -rf /var/cache/dnf
+    rm -rf /var/cache/dnf && \
+    ln -s /usr/bin/node-24 /usr/local/bin/node && \
+    ln -s /usr/bin/npm-24 /usr/local/bin/npm && \
+    ln -s /usr/bin/npx-24 /usr/local/bin/npx
 
 # Create group and user matching the host IDs
 RUN groupadd -g $GROUP_ID sandbox && \

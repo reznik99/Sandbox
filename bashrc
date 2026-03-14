@@ -1,8 +1,3 @@
-# Node.js 24 (Fedora ships versioned binaries)
-alias node='node-24'
-alias npm='npm-24'
-alias npx='npx-24'
-
 # lsd replaces ls
 alias ll='lsd -l'
 alias la='lsd -la'

@@ -39,35 +39,61 @@ Add these to your `~/.bashrc` or `~/.profile`:
 
 ```bash
 # Fully isolated sandbox (no shared host files)
-alias sandbox='podman start -ai sandbox 2>/dev/null || podman run -it \
-  --name sandbox \
-  --cap-drop=ALL \
-  --security-opt=no-new-privileges \
-  --userns=keep-id \
-  --pids-limit=512 \
-  --memory=2g \
-  --cpus=10 \
-  localhost/sandbox bash'
+sandbox() {
+    local name="sandbox"
+    local state
+    state=$(podman inspect --format '{{.State.Status}}' "$name" 2>/dev/null)
+
+    if [ "$state" = "running" ]; then
+        podman exec -it "$name" bash
+    elif [ "$state" = "exited" ]; then
+        podman start "$name"
+        podman exec -it "$name" bash
+    else
+        podman run -d \
+          --name "$name" \
+          --cap-drop=ALL \
+          --security-opt=no-new-privileges \
+          --userns=keep-id \
+          --pids-limit=512 \
+          --memory=2g \
+          --cpus=10 \
+          localhost/sandbox sleep infinity
+        podman exec -it "$name" bash
+    fi
+}
 
 # Sandbox with ONLY ~/Code mounted
-alias sandbox-code='podman start -ai sandbox-code 2>/dev/null || podman run -it \
-  --name sandbox-code \
-  --cap-drop=ALL \
-  --security-opt=no-new-privileges \
-  --userns=keep-id \
-  --pids-limit=512 \
-  --memory=4g \
-  --cpus=10 \
-  -v ~/Code:/workspace:rw,z \
-  -w /workspace \
-  localhost/sandbox bash'
+sandbox-code() {
+    local name="sandbox-code"
+    local state
+    state=$(podman inspect --format '{{.State.Status}}' "$name" 2>/dev/null)
+
+    if [ "$state" = "running" ]; then
+        podman exec -it "$name" bash
+    elif [ "$state" = "exited" ]; then
+        podman start "$name"
+        podman exec -it "$name" bash
+    else
+        podman run -d \
+          --name "$name" \
+          --cap-drop=ALL \
+          --security-opt=no-new-privileges \
+          --userns=keep-id \
+          --pids-limit=512 \
+          --memory=4g \
+          --cpus=10 \
+          -v ~/Code:/workspace:rw,z \
+          -w /workspace \
+          localhost/sandbox sleep infinity
+        podman exec -it "$name" bash
+    fi
+}
 
 # Stop the sandbox
-alias sandbox-stop='podman stop sandbox sandbox-code'
-
+alias sandbox-stop='podman stop -t 0 sandbox sandbox-code'
 # Destroy the sandbox (container only, image is kept)
 alias sandbox-nuke='podman rm -f sandbox sandbox-code'
-
 # Rebuild the image from scratch
 alias sandbox-rebuild='podman build --no-cache -t sandbox .'
 ```
