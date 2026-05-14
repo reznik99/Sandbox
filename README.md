@@ -127,10 +127,11 @@ sandbox-dev() {
     fi
 }
 
-# Stop all sandbox containers (SIGKILL — instant; PID 1 is `sleep infinity` with nothing to flush)
-alias sandbox-stop='podman kill sandbox sandbox-code sandbox-dev 2>/dev/null'
-# Destroy all sandbox containers (image and volumes are kept)
-alias sandbox-nuke='podman rm -f sandbox sandbox-code sandbox-dev 2>/dev/null'
+# Stop all sandbox containers. `--ignore` skips containers that don't exist;
+# `-t 0` is effectively instant (PID 1 is `sleep infinity` so nothing to flush).
+alias sandbox-stop='podman stop -t 0 --ignore sandbox sandbox-code sandbox-dev'
+# Destroy all sandbox containers (image and volumes are kept).
+alias sandbox-nuke='podman rm -f --ignore sandbox sandbox-code sandbox-dev'
 # Rebuild the image from scratch
 alias sandbox-rebuild='podman build --no-cache -t sandbox .'
 ```
