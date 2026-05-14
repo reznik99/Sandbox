@@ -30,6 +30,15 @@ COPY --chown=sandbox:sandbox bashrc /home/sandbox/.bashrc
 USER sandbox
 WORKDIR /home/sandbox
 
+# Pre-create persistent state dirs so the named volume mount inherits
+# correct ownership (sandbox:sandbox) on first run.
+# Also redirect ~/.claude.json (which Claude writes at $HOME, outside
+# ~/.claude/) into the same volume via a symlink. Claude uses
+# open()/write()/close() (it keeps its own backups, doesn't atomic-rename),
+# so the symlink survives writes.
+RUN mkdir -p /home/sandbox/.claude && \
+    ln -s /home/sandbox/.claude/claude.json /home/sandbox/.claude.json
+
 # Install Claude Code as the sandbox user
 RUN curl -fsSL https://claude.ai/install.sh | bash
 

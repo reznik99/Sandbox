@@ -58,6 +58,7 @@ sandbox() {
           --pids-limit=512 \
           --memory=2g \
           --cpus=10 \
+          -v sandbox-claude:/home/sandbox/.claude \
           localhost/sandbox sleep infinity
         podman exec -it "$name" bash
     fi
@@ -83,6 +84,7 @@ sandbox-code() {
           --pids-limit=512 \
           --memory=4g \
           --cpus=10 \
+          -v sandbox-claude:/home/sandbox/.claude \
           -v ~/Code:/workspace:rw,z \
           -w /workspace \
           localhost/sandbox sleep infinity
@@ -90,8 +92,8 @@ sandbox-code() {
     fi
 }
 
-# Stop the sandbox
-alias sandbox-stop='podman stop -t 0 sandbox sandbox-code'
+# Stop the sandbox (SIGKILL — instant; PID 1 is `sleep infinity` with nothing to flush)
+alias sandbox-stop='podman kill sandbox sandbox-code'
 # Destroy the sandbox (container only, image is kept)
 alias sandbox-nuke='podman rm -f sandbox sandbox-code'
 # Rebuild the image from scratch
@@ -116,6 +118,24 @@ sandbox-nuke
 # Rebuild the image (e.g. after editing the Dockerfile)
 sandbox-rebuild
 ```
+
+## Persistent state
+
+Per-app state lives in named podman volumes mounted at the app's standard
+path inside the container. Auth, settings, skills, and memory survive
+`sandbox-nuke` and `sandbox-rebuild`; only `podman volume rm <name>` wipes them.
+
+| Volume | Mount point | Holds |
+| --- | --- | --- |
+| `sandbox-claude` | `/home/sandbox/.claude` | Claude Code auth, settings, skills, memory |
+
+First time you run `sandbox`, the volume is empty — run `claude login` once
+and it's persisted from then on. Subsequent `sandbox-nuke`/`sandbox-rebuild`
+keeps you logged in.
+
+To add more persistent paths later (e.g. LazyVim plugins), add another
+named volume mount to both `sandbox` and `sandbox-code` and create the
+target directory in the `Dockerfile` for clean ownership.
 
 ## Security
 
