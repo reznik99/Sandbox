@@ -47,5 +47,18 @@ ENV GOPATH=/home/sandbox/go
 ENV PATH=$PATH:$GOPATH/bin
 # Ensure the Claude binary is in the PATH
 ENV PATH="/home/sandbox/.local/bin:${PATH}"
+# Redirect npm's global prefix to a user-writable path so `npm install -g`
+# works without root. Binaries land in /home/sandbox/.local/bin (already in PATH).
+ENV NPM_CONFIG_PREFIX=/home/sandbox/.local
+# Enforce a 2-day cooldown on every npm install inside the sandbox — neutralises
+# fast-burn supply-chain worms (Shai-Hulud, etc.) that get yanked within hours.
+# Override per-command with `npm install --min-release-age=0 <pkg>` when needed.
+ENV NPM_CONFIG_MIN_RELEASE_AGE=2
+
+# Fedora 44 ships npm 11.8.0, but `min-release-age` only exists in npm ≥ 11.10.0.
+# Self-upgrade npm into NPM_CONFIG_PREFIX so the cooldown actually takes effect.
+# The bootstrap install runs as the old npm 11.8.0 (which ignores the env var),
+# so the upgrade itself can't be blocked by the cooldown.
+RUN npm install -g npm@latest
 
 CMD ["/bin/bash"]
