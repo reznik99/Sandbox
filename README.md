@@ -19,10 +19,12 @@ attacks by isolating dependency execution from your host credentials.
 | OpenSSL        | openssl                |
 | curl           | curl                   |
 | wget           | wget                   |
+| Neovim         | neovim                 |
 | Vim            | vim                    |
 | fzf            | fzf                    |
 | lsd            | lsd                    |
 | ripgrep        | ripgrep                |
+| fd             | fd-find                |
 | find           | findutils              |
 | ps/top         | procps-ng              |
 | Claude Code    | claude.ai/install.sh   |
@@ -67,7 +69,7 @@ sandbox() {
     fi
 }
 
-# Sandbox for AI-assisted editing — code mounts + Claude state, NO forwarded ports.
+# Sandbox for AI-assisted editing — code mounts + Claude state + nvim, NO forwarded ports.
 sandbox-code() {
     local name="sandbox-code"
     local state
@@ -88,6 +90,9 @@ sandbox-code() {
           --memory=4g \
           --cpus=10 \
           -v sandbox-claude:/home/sandbox/.claude \
+          -v sandbox-nvim-share:/home/sandbox/.local/share/nvim \
+          -v sandbox-nvim-state:/home/sandbox/.local/state/nvim \
+          -v ~/.config/nvim:/home/sandbox/.config/nvim:rw,z \
           -v ~/Code:/workspace:rw,z \
           -w /workspace \
           localhost/sandbox sleep infinity

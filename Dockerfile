@@ -10,6 +10,10 @@ RUN dnf upgrade -y --refresh && \
         nodejs24 nodejs24-npm golang \
         # Build Tools (Optional but recommended for CGO/Native modules)
         gcc gcc-c++ make \
+        # Editor: LazyVim reads its config from /home/sandbox/.config/nvim
+        # (bind-mounted from host). Plugins live in named volumes so they
+        # survive sandbox-nuke. See `Persistent state` in README.
+        neovim fd-find \
         # Utilities
         openssh-clients git fzf lsd gnupg2 \
         openssl curl wget vim findutils procps-ng ripgrep \
@@ -36,7 +40,12 @@ WORKDIR /home/sandbox
 # ~/.claude/) into the same volume via a symlink. Claude uses
 # open()/write()/close() (it keeps its own backups, doesn't atomic-rename),
 # so the symlink survives writes.
-RUN mkdir -p /home/sandbox/.claude && \
+#   .claude              — Claude Code auth/settings/memory  (sandbox-claude)
+#   .local/share/nvim    — LazyVim plugins + compiled treesitter parsers  (sandbox-nvim-share)
+#   .local/state/nvim    — undo history, shada, sessions, LSP logs        (sandbox-nvim-state)
+RUN mkdir -p /home/sandbox/.claude \
+             /home/sandbox/.local/share/nvim \
+             /home/sandbox/.local/state/nvim && \
     ln -s /home/sandbox/.claude/claude.json /home/sandbox/.claude.json
 
 # Install Claude Code as the sandbox user
@@ -50,15 +59,35 @@ ENV PATH="/home/sandbox/.local/bin:${PATH}"
 # Redirect npm's global prefix to a user-writable path so `npm install -g`
 # works without root. Binaries land in /home/sandbox/.local/bin (already in PATH).
 ENV NPM_CONFIG_PREFIX=/home/sandbox/.local
-# Enforce a 2-day cooldown on every npm install inside the sandbox — neutralises
+# Enforce a 3-day cooldown on every npm install inside the sandbox — neutralises
 # fast-burn supply-chain worms (Shai-Hulud, etc.) that get yanked within hours.
 # Override per-command with `npm install --min-release-age=0 <pkg>` when needed.
-ENV NPM_CONFIG_MIN_RELEASE_AGE=2
+ENV NPM_CONFIG_MIN_RELEASE_AGE=3
 
 # Fedora 44 ships npm 11.8.0, but `min-release-age` only exists in npm ≥ 11.10.0.
 # Self-upgrade npm into NPM_CONFIG_PREFIX so the cooldown actually takes effect.
 # The bootstrap install runs as the old npm 11.8.0 (which ignores the env var),
 # so the upgrade itself can't be blocked by the cooldown.
 RUN npm install -g npm@latest
+
+# Go-based LSPs, formatters, linter, debugger.
+# `go install` has no min-release-age equivalent, but GOSUMDB (sum.golang.org)
+# provides checksum verification by default. Versions are pinned to whatever
+# was @latest at image build time — rebuild the image to update.
+RUN go install golang.org/x/tools/gopls@latest && \
+    go install mvdan.cc/gofumpt@latest && \
+    go install golang.org/x/tools/cmd/goimports@latest && \
+    go install github.com/go-delve/delve/cmd/dlv@latest && \
+    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+
+# npm-based LSPs, formatters, linter. NPM_CONFIG_MIN_RELEASE_AGE=3 (set above)
+# enforces a 3-day publish-age cooldown — npm resolves to the latest version
+# that is at least 3 days old. Same cooldown applies on rebuild.
+RUN npm install -g \
+        typescript \
+        @vtsls/language-server \
+        prettier \
+        eslint_d \
+        vscode-langservers-extracted
 
 CMD ["/bin/bash"]
