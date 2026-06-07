@@ -29,6 +29,13 @@ by isolating dependency execution from your host credentials.
 | ps/top         | procps-ng              |
 | Claude Code    | claude.ai/install.sh   |
 | Codex CLI      | @openai/codex (npm)    |
+| GitHub CLI     | gh                     |
+| jq             | jq                     |
+| protoc         | protobuf-compiler      |
+| buf            | go install             |
+| protoc-gen-go, protoc-gen-go-grpc, protoc-gen-validate | go install |
+| mockery, golines, gci | go install      |
+| Postman CLI    | postman-cli (npm)      |
 
 ## Build the image
 

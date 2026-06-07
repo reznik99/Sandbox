@@ -17,6 +17,9 @@ RUN dnf upgrade -y --refresh && \
         # Utilities
         openssh-clients git fzf lsd gnupg2 \
         openssl curl wget vim findutils procps-ng ripgrep \
+        # Caruso work: GitHub CLI, JSON wrangling, protoc compiler
+        # (codegen plugins are installed via `go install` below).
+        gh jq protobuf-compiler \
         # Codex CLI sandboxing backend
         bubblewrap \
         && \
@@ -109,5 +112,27 @@ RUN npm install -g \
         prettier \
         eslint_d \
         vscode-langservers-extracted
+
+# === Caruso work tooling ===
+# Everything below is for the work environment (gh + AWS dev + protobuf codegen
+# + Postman). Keep these in their own blocks so they're easy to revert and the
+# layers cache independently of the personal-project tools above.
+
+# Caruso Go toolchain: buf for proto workspace mgmt, protoc-gen-* for codegen,
+# mockery for test mocks, golines/gci for formatting. protoc-gen-validate is
+# pinned to v0.10.1 per Caruso convention — newer versions emit incompatible
+# generated code. The rest float with the rebuild (same caveat as above re:
+# `go install @latest` having no release-age cooldown).
+RUN go install github.com/bufbuild/buf/cmd/buf@latest && \
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest && \
+    go install github.com/envoyproxy/protoc-gen-validate@v0.10.1 && \
+    go install github.com/vektra/mockery/v2@latest && \
+    go install github.com/segmentio/golines@latest && \
+    go install github.com/daixiang0/gci@latest
+
+# Postman CLI — used by /postman-run-tests and /postman-run-integration-tests.
+# Same 3-day cooldown as the npm block above.
+RUN npm install -g postman-cli
 
 CMD ["/bin/bash"]
