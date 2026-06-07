@@ -70,6 +70,12 @@ ENV NPM_CONFIG_MIN_RELEASE_AGE=3
 # so the upgrade itself can't be blocked by the cooldown.
 RUN npm install -g npm@latest
 
+# Fedora pins GOTOOLCHAIN=local, but tools like gopls may require a newer Go
+# than the distro package (e.g. gopls v0.22 needs go >= 1.26 vs Fedora's 1.25).
+# `auto` lets `go install` fetch the required toolchain on demand — still
+# checksum-verified via GOSUMDB, so the supply-chain posture is unchanged.
+ENV GOTOOLCHAIN=auto
+
 # Go-based LSPs, formatters, linter, debugger.
 # `go install` has no min-release-age equivalent, but GOSUMDB (sum.golang.org)
 # provides checksum verification by default. Versions are pinned to whatever
