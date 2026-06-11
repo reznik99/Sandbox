@@ -17,6 +17,8 @@ RUN dnf upgrade -y --refresh && \
         # Utilities
         openssh-clients git fzf lsd gnupg2 \
         openssl curl wget vim findutils procps-ng ripgrep \
+        # Codex CLI sandboxing backend
+        bubblewrap \
         && \
     dnf clean all && \
     rm -rf /var/cache/dnf && \
@@ -40,13 +42,20 @@ WORKDIR /home/sandbox
 # ~/.claude/) into the same volume via a symlink. Claude uses
 # open()/write()/close() (it keeps its own backups, doesn't atomic-rename),
 # so the symlink survives writes.
+# ~/.agents is symlinked into the Codex volume too — it stores shared agent
+# skill content (read by Codex at ~/.agents/skills/) and we want it to live
+# in the same persistent volume as Codex's own state.
 #   .claude              — Claude Code auth/settings/memory  (sandbox-claude)
+#   .codex               — Codex CLI auth/config/sessions    (sandbox-codex)
+#   .codex/agents        — shared agent skills, exposed as ~/.agents via symlink
 #   .local/share/nvim    — LazyVim plugins + compiled treesitter parsers  (sandbox-nvim-share)
 #   .local/state/nvim    — undo history, shada, sessions, LSP logs        (sandbox-nvim-state)
 RUN mkdir -p /home/sandbox/.claude \
+             /home/sandbox/.codex/agents \
              /home/sandbox/.local/share/nvim \
              /home/sandbox/.local/state/nvim && \
-    ln -s /home/sandbox/.claude/claude.json /home/sandbox/.claude.json
+    ln -s /home/sandbox/.claude/claude.json /home/sandbox/.claude.json && \
+    ln -s /home/sandbox/.codex/agents       /home/sandbox/.agents
 
 # Install Claude Code as the sandbox user
 RUN curl -fsSL https://claude.ai/install.sh | bash
@@ -75,6 +84,11 @@ RUN npm install -g npm@latest
 # `auto` lets `go install` fetch the required toolchain on demand — still
 # checksum-verified via GOSUMDB, so the supply-chain posture is unchanged.
 ENV GOTOOLCHAIN=auto
+
+# Codex CLI — installed alongside Claude. State lives in ~/.codex
+# (sandbox-codex volume), mounted only in sandbox-code (same trust model
+# as the Claude volume).
+RUN npm install -g @openai/codex
 
 # Go-based LSPs, formatters, linter, debugger.
 # `go install` has no min-release-age equivalent, but GOSUMDB (sum.golang.org)

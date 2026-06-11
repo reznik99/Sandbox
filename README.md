@@ -1,9 +1,9 @@
 # Sandbox
 
-A secure Podman image with three preset run profiles for sandboxed
-development work — scratch (`sandbox`), AI-assisted editing (`sandbox-code`),
-and dev-server (`sandbox-dev`). Designed to neutralise npm/Go supply-chain
-attacks by isolating dependency execution from your host credentials.
+A secure Podman image with two preset run profiles for sandboxed
+development work — scratch (`sandbox`) and AI-assisted editing
+(`sandbox-code`). Designed to neutralise npm/Go supply-chain attacks
+by isolating dependency execution from your host credentials.
 
 ## Included tools
 
@@ -28,6 +28,7 @@ attacks by isolating dependency execution from your host credentials.
 | find           | findutils              |
 | ps/top         | procps-ng              |
 | Claude Code    | claude.ai/install.sh   |
+| Codex CLI      | @openai/codex (npm)    |
 
 ## Build the image
 
@@ -58,12 +59,14 @@ sandbox() {
     else
         podman run -d \
           --name "$name" \
+          --init \
           --cap-drop=ALL \
           --security-opt=no-new-privileges \
           --userns=keep-id \
           --pids-limit=512 \
           --memory=2g \
           --cpus=10 \
+          --tmpfs /tmp:rw,noexec,nosuid,size=512m \
           localhost/sandbox sleep infinity
         podman exec -it "$name" bash
     fi
@@ -83,49 +86,20 @@ sandbox-code() {
     else
         podman run -d \
           --name "$name" \
+          --init \
           --cap-drop=ALL \
           --security-opt=no-new-privileges \
           --userns=keep-id \
           --pids-limit=512 \
           --memory=4g \
           --cpus=10 \
+          --tmpfs /tmp:rw,noexec,nosuid,size=512m \
           -v sandbox-claude:/home/sandbox/.claude \
+          -v sandbox-codex:/home/sandbox/.codex \
           -v sandbox-nvim-share:/home/sandbox/.local/share/nvim \
           -v sandbox-nvim-state:/home/sandbox/.local/state/nvim \
-          -v ~/.config/nvim:/home/sandbox/.config/nvim:rw,z \
+          -v ~/.config/nvim:/home/sandbox/.config/nvim:ro,z \
           -v ~/Code:/workspace:rw,z \
-          -w /workspace \
-          localhost/sandbox sleep infinity
-        podman exec -it "$name" bash
-    fi
-}
-
-# Sandbox for running dev servers — code mounts + port forwarding, NO Claude state.
-# Keeping the Claude token out of this container reduces blast radius if a
-# running dev process pulls in a compromised dep.
-sandbox-dev() {
-    local name="sandbox-dev"
-    local state
-    state=$(podman inspect --format '{{.State.Status}}' "$name" 2>/dev/null)
-
-    if [ "$state" = "running" ]; then
-        podman exec -it "$name" bash
-    elif [ "$state" = "exited" ]; then
-        podman start "$name"
-        podman exec -it "$name" bash
-    else
-        podman run -d \
-          --name "$name" \
-          --cap-drop=ALL \
-          --security-opt=no-new-privileges \
-          --userns=keep-id \
-          --pids-limit=512 \
-          --memory=4g \
-          --cpus=10 \
-          -v ~/Code:/workspace:rw,z \
-          -p 3000-3010:3000-3010 \
-          -p 8080-8085:8080-8085 \
-          -p 9229:9229 \
           -w /workspace \
           localhost/sandbox sleep infinity
         podman exec -it "$name" bash
@@ -134,30 +108,28 @@ sandbox-dev() {
 
 # Stop all sandbox containers. `--ignore` skips containers that don't exist;
 # `-t 0` is effectively instant (PID 1 is `sleep infinity` so nothing to flush).
-alias sandbox-stop='podman stop -t 0 --ignore sandbox sandbox-code sandbox-dev'
+alias sandbox-stop='podman stop -t 0 --ignore sandbox sandbox-code'
 # Destroy all sandbox containers (image and volumes are kept).
-alias sandbox-nuke='podman rm -f --ignore sandbox sandbox-code sandbox-dev'
+alias sandbox-nuke='podman rm -f --ignore sandbox sandbox-code'
 # Rebuild the image from scratch
 alias sandbox-rebuild='podman build --no-cache -t sandbox .'
 ```
 
 ## Usage
 
-Three sandboxes for three different jobs. Each is a separate container — you can have any combination running concurrently in different terminals.
+Two sandboxes for two different jobs. Each is a separate container — you can have both running concurrently in different terminals.
 
 | Command | Mounts | Ports | Use for |
 | --- | --- | --- | --- |
 | `sandbox` | none | none | Throwaway scratch. Running unknown code with zero credential exposure. |
-| `sandbox-code` | `sandbox-claude` volume + `~/Code` at `/workspace` | none | Reading/editing code with Claude Code. |
-| `sandbox-dev` | `~/Code` at `/workspace` | `3000-3010`, `8080-8085`, `9229` | Running dev servers, builds, tests. Browser on host reaches `localhost:3000` etc. No Claude token mounted, so a compromised dep can't steal it. |
+| `sandbox-code` | `sandbox-claude` + `sandbox-codex` volumes + `~/Code` at `/workspace` + `~/.config/nvim` read-only | none | Reading/editing code with Claude Code or Codex CLI. |
 
 ```bash
 sandbox          # enter the scratch sandbox
 sandbox-code     # enter the code+Claude sandbox
-sandbox-dev      # enter the code+ports sandbox (no Claude)
 
-sandbox-stop     # stop all three (SIGKILL — instant)
-sandbox-nuke     # destroy all three containers (volumes survive)
+sandbox-stop     # stop all sandboxes (SIGKILL — instant)
+sandbox-nuke     # destroy all sandboxes (volumes survive)
 sandbox-rebuild  # rebuild the image from scratch
 ```
 
@@ -170,19 +142,26 @@ only `podman volume rm <name>` wipes them.
 | Volume | Mount point | Mounted in | Holds |
 | --- | --- | --- | --- |
 | `sandbox-claude` | `/home/sandbox/.claude` | `sandbox-code` only | Claude Code auth, settings, skills, memory |
+| `sandbox-codex` | `/home/sandbox/.codex` | `sandbox-code` only | Codex CLI auth, config, sessions, memories, plus `~/.agents/` content via symlink |
 
-The Dockerfile also baked a symlink `~/.claude.json → ~/.claude/claude.json`,
-so the `~/.claude.json` file (which Claude writes at `$HOME` root, outside
-`~/.claude/`) is also redirected into the volume. Together this is enough
-for `claude login` to persist fully.
+The Dockerfile bakes two symlinks that redirect host-style paths into the
+named volumes so writes persist transparently:
 
-First time you run `sandbox-code`, the volume is empty — run `claude login`
-once and it's persisted from then on. Subsequent `sandbox-nuke` /
-`sandbox-rebuild` keeps you logged in.
+- `~/.claude.json → ~/.claude/claude.json` — Claude writes this file at
+  `$HOME` root (outside `~/.claude/`); the symlink redirects it back inside
+  the volume. Claude uses `open()/write()/close()` (not atomic-rename) so
+  the symlink survives.
+- `~/.agents → ~/.codex/agents` — `~/.agents/` is the shared agent skill
+  location read by Codex (and originally Claude). It physically lives
+  inside the Codex volume, so a single volume holds everything Codex needs.
 
-`sandbox` and `sandbox-dev` deliberately do NOT mount the volume — they have
-no business with your Claude credentials. Worms running in those containers
-can't reach the token.
+First time you run `sandbox-code`, the volumes are empty — run `claude login`
+and `codex login` once and they're persisted from then on. Subsequent
+`sandbox-nuke` / `sandbox-rebuild` keeps you logged in.
+
+`sandbox` deliberately does NOT mount the Claude/Codex volumes — it has no
+business with your credentials. Worms running in that container can't reach
+the token.
 
 To add more persistent paths later (e.g. LazyVim plugins), add a named
 volume mount to the relevant function(s) and create the target directory in
@@ -196,9 +175,15 @@ Each container runs with:
 - `--security-opt=no-new-privileges` — prevents privilege escalation
 - `--userns=keep-id` — maps host UID into the container (rootless)
 - `--pids-limit=512` — limits fork bombs
-- `--memory=2g` (`sandbox`) or `4g` (`sandbox-code` / `sandbox-dev`) — caps memory
+- `--memory=2g` (`sandbox`) or `4g` (`sandbox-code`) — caps memory
 - `--cpus=10` — caps CPU usage
+- `--tmpfs /tmp:rw,noexec,nosuid,size=512m` — `/tmp` is non-executable, blocks
+  the "drop payload, chmod +x, exec" pattern common in npm/Go worms
+- `--init` — proper PID 1 reaps zombies (matters for long-lived sessions)
 - Non-root user (`sandbox`) inside the container
+- `~/.config/nvim` mounted read-only in `sandbox-code` — a compromised dep
+  can't rewrite your host nvim config (which executes when you open nvim
+  outside the container)
 
 The image also bakes in defenses against npm supply-chain attacks:
 
