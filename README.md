@@ -66,7 +66,7 @@ sandbox() {
           --pids-limit=512 \
           --memory=2g \
           --cpus=10 \
-          --tmpfs /tmp:rw,noexec,nosuid,size=512m \
+          --tmpfs /tmp:rw,noexec,nosuid,size=4g \
           localhost/sandbox sleep infinity
         podman exec -it "$name" bash
     fi
@@ -93,7 +93,7 @@ sandbox-code() {
           --pids-limit=512 \
           --memory=4g \
           --cpus=10 \
-          --tmpfs /tmp:rw,noexec,nosuid,size=512m \
+          --tmpfs /tmp:rw,noexec,nosuid,size=4g \
           -v sandbox-claude:/home/sandbox/.claude \
           -v sandbox-codex:/home/sandbox/.codex \
           -v sandbox-nvim-share:/home/sandbox/.local/share/nvim \
@@ -177,7 +177,7 @@ Each container runs with:
 - `--pids-limit=512` — limits fork bombs
 - `--memory=2g` (`sandbox`) or `4g` (`sandbox-code`) — caps memory
 - `--cpus=10` — caps CPU usage
-- `--tmpfs /tmp:rw,noexec,nosuid,size=512m` — `/tmp` is non-executable, blocks
+- `--tmpfs /tmp:rw,noexec,nosuid,size=4g` — `/tmp` is non-executable, blocks
   the "drop payload, chmod +x, exec" pattern common in npm/Go worms
 - `--init` — proper PID 1 reaps zombies (matters for long-lived sessions)
 - Non-root user (`sandbox`) inside the container
