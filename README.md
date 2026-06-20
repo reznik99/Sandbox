@@ -7,11 +7,11 @@ by isolating dependency execution from your host credentials.
 
 ## Included tools
 
-| Tool           | Package                |
-| -------------- | ---------------------- |
-| Node.js 24     | nodejs24, nodejs24-npm |
-| Go             | golang                 |
-| GCC/G++        | gcc, gcc-c++           |
+| Tool           | Source                          |
+| -------------- | ------------------------------- |
+| Node.js 24 LTS | nodejs.org (tarball)            |
+| Go             | go.dev (tarball)                |
+| GCC/G++        | gcc, gcc-c++                    |
 | Make           | make                   |
 | Git            | git                    |
 | SSH            | openssh-clients        |
@@ -27,8 +27,8 @@ by isolating dependency execution from your host credentials.
 | fd             | fd-find                |
 | find           | findutils              |
 | ps/top         | procps-ng              |
-| Claude Code    | claude.ai/install.sh   |
-| Codex CLI      | @openai/codex (npm)    |
+| Claude Code    | @anthropic-ai/claude-code (npm) |
+| Codex CLI      | @openai/codex (npm)             |
 
 ## Build the image
 
@@ -189,10 +189,10 @@ The image also bakes in defenses against npm supply-chain attacks:
 
 - `NPM_CONFIG_PREFIX=/home/sandbox/.local` — `npm install -g` works as the
   non-root sandbox user without touching `/usr/local`
-- `NPM_CONFIG_MIN_RELEASE_AGE=2` — every `npm install` enforces a 2-day
+- `NPM_CONFIG_MIN_RELEASE_AGE=3` — every `npm install` enforces a 3-day
   cooldown on newly published versions. Most fast-burn worms (Shai-Hulud
   style) are detected and yanked within hours, so the cooldown skips over
   them entirely. Override per command with `npm install --min-release-age=0 <pkg>`
   when you actually need a freshly published version.
-- npm is self-upgraded to ≥ 11.10.0 during build (Fedora ships 11.8.0, which
-  predates the `min-release-age` setting).
+- npm is self-upgraded to the latest release during build, keeping it ahead
+  of the version bundled with Node.

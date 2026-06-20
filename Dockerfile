@@ -4,15 +4,13 @@ FROM fedora:latest
 ARG USER_ID=1000
 ARG GROUP_ID=1000
 
+# Go and Node come from upstream tarballs below, not dnf: Fedora's `golang` is
+# built with GOEXPERIMENT=nodwarf5, which breaks GOTOOLCHAIN=auto switching.
 RUN dnf upgrade -y --refresh && \
     dnf install -y \
-        # Core Dev Tools
-        nodejs24 nodejs24-npm golang \
-        # Build Tools (Optional but recommended for CGO/Native modules)
+        # Build Tools
         gcc gcc-c++ make \
-        # Editor: LazyVim reads its config from /home/sandbox/.config/nvim
-        # (bind-mounted from host). Plugins live in named volumes so they
-        # survive sandbox-nuke. See `Persistent state` in README.
+        # LazyVim config bind-mounted from host; plugins in named volumes.
         neovim fd-find \
         # Utilities
         openssh-clients git fzf lsd gnupg2 \
@@ -21,10 +19,26 @@ RUN dnf upgrade -y --refresh && \
         bubblewrap \
         && \
     dnf clean all && \
-    rm -rf /var/cache/dnf && \
-    ln -s /usr/bin/node-24 /usr/local/bin/node && \
-    ln -s /usr/bin/npm-24 /usr/local/bin/npm && \
-    ln -s /usr/bin/npx-24 /usr/local/bin/npx
+    rm -rf /var/cache/dnf
+
+# Go — stock upstream toolchain (no LTS; latest stable patch). SHA-256 per go.dev/dl.
+ARG GO_VERSION=1.26.4
+ARG GO_SHA256=1153d3d50e0ac764b447adfe05c2bcf08e889d42a02e0fe0259bd47f6733ad7f
+RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz && \
+    echo "${GO_SHA256}  /tmp/go.tgz" | sha256sum -c - && \
+    tar -C /usr/local -xzf /tmp/go.tgz && \
+    rm /tmp/go.tgz
+
+# Node — v24 (Krypton) Active LTS. SHA-256 per nodejs.org/dist.
+ARG NODE_VERSION=24.17.0
+ARG NODE_SHA256=e0472427aa791ad80bdc426ff7cc73cdd28ed0f616d1ff9689a23a7f47f1265f
+RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz" -o /tmp/node.tgz && \
+    echo "${NODE_SHA256}  /tmp/node.tgz" | sha256sum -c - && \
+    mkdir -p /usr/local/node && \
+    tar -C /usr/local/node --strip-components=1 -xzf /tmp/node.tgz && \
+    rm /tmp/node.tgz
+
+ENV PATH="/usr/local/go/bin:/usr/local/node/bin:${PATH}"
 
 # Create group and user matching the host IDs
 RUN groupadd -g $GROUP_ID sandbox && \
@@ -57,9 +71,6 @@ RUN mkdir -p /home/sandbox/.claude \
     ln -s /home/sandbox/.claude/claude.json /home/sandbox/.claude.json && \
     ln -s /home/sandbox/.codex/agents       /home/sandbox/.agents
 
-# Install Claude Code as the sandbox user
-RUN curl -fsSL https://claude.ai/install.sh | bash
-
 # Set Go paths inside the container
 ENV GOPATH=/home/sandbox/go
 ENV PATH=$PATH:$GOPATH/bin
@@ -73,22 +84,14 @@ ENV NPM_CONFIG_PREFIX=/home/sandbox/.local
 # Override per-command with `npm install --min-release-age=0 <pkg>` when needed.
 ENV NPM_CONFIG_MIN_RELEASE_AGE=3
 
-# Fedora 44 ships npm 11.8.0, but `min-release-age` only exists in npm ≥ 11.10.0.
-# Self-upgrade npm into NPM_CONFIG_PREFIX so the cooldown actually takes effect.
-# The bootstrap install runs as the old npm 11.8.0 (which ignores the env var),
-# so the upgrade itself can't be blocked by the cooldown.
+# Keep npm current; the version bundled with Node lags upstream releases.
 RUN npm install -g npm@latest
 
-# Fedora pins GOTOOLCHAIN=local, but tools like gopls may require a newer Go
-# than the distro package (e.g. gopls v0.22 needs go >= 1.26 vs Fedora's 1.25).
-# `auto` lets `go install` fetch the required toolchain on demand — still
-# checksum-verified via GOSUMDB, so the supply-chain posture is unchanged.
+# Let `go install` / go.mod fetch newer toolchains on demand, checksum-verified via GOSUMDB.
 ENV GOTOOLCHAIN=auto
 
-# Codex CLI — installed alongside Claude. State lives in ~/.codex
-# (sandbox-codex volume), mounted only in sandbox-code (same trust model
-# as the Claude volume).
-RUN npm install -g @openai/codex
+# Claude Code + Codex CLI. State lives in ~/.claude and ~/.codex volumes.
+RUN npm install -g @anthropic-ai/claude-code @openai/codex
 
 # Go-based LSPs, formatters, linter, debugger.
 # `go install` has no min-release-age equivalent, but GOSUMDB (sum.golang.org)
