@@ -60,12 +60,16 @@ WORKDIR /home/sandbox
 # skill content (read by Codex at ~/.agents/skills/) and we want it to live
 # in the same persistent volume as Codex's own state.
 #   .claude              — Claude Code auth/settings/memory  (sandbox-claude)
-#   .codex               — Codex CLI auth/config/sessions    (sandbox-codex)
-#   .codex/agents        — shared agent skills, exposed as ~/.agents via symlink
-#   .local/share/nvim    — LazyVim plugins + compiled treesitter parsers  (sandbox-nvim-share)
-#   .local/state/nvim    — undo history, shada, sessions, LSP logs        (sandbox-nvim-state)
+#   .codex                   — Codex CLI auth/config/sessions      (sandbox-codex)
+#   .codex/agents            — shared agent skills, exposed as ~/.agents via symlink
+#   .local/share/opencode    — OpenCode auth/data                  (sandbox-opencode-data)
+#   .config/opencode         — OpenCode global config              (sandbox-opencode-config)
+#   .local/share/nvim        — LazyVim plugins + compiled treesitter parsers  (sandbox-nvim-share)
+#   .local/state/nvim        — undo history, shada, sessions, LSP logs        (sandbox-nvim-state)
 RUN mkdir -p /home/sandbox/.claude \
              /home/sandbox/.codex/agents \
+             /home/sandbox/.local/share/opencode \
+             /home/sandbox/.config/opencode \
              /home/sandbox/.local/share/nvim \
              /home/sandbox/.local/state/nvim && \
     ln -s /home/sandbox/.claude/claude.json /home/sandbox/.claude.json && \
@@ -90,8 +94,10 @@ RUN npm install -g npm@latest
 # Let `go install` / go.mod fetch newer toolchains on demand, checksum-verified via GOSUMDB.
 ENV GOTOOLCHAIN=auto
 
-# Claude Code + Codex CLI. State lives in ~/.claude and ~/.codex volumes.
-RUN npm install -g @anthropic-ai/claude-code @openai/codex
+# Claude Code, Codex CLI, and OpenCode. State lives in separate volumes mounted
+# only in sandbox-code. OpenCode stores provider credentials under
+# ~/.local/share/opencode/auth.json and global config under ~/.config/opencode.
+RUN npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai
 
 # Go-based LSPs, formatters, linter, debugger.
 # `go install` has no min-release-age equivalent, but GOSUMDB (sum.golang.org)

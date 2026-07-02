@@ -29,6 +29,7 @@ by isolating dependency execution from your host credentials.
 | ps/top         | procps-ng              |
 | Claude Code    | @anthropic-ai/claude-code (npm) |
 | Codex CLI      | @openai/codex (npm)             |
+| OpenCode       | opencode-ai (npm)               |
 
 ## Build the image
 
@@ -72,7 +73,7 @@ sandbox() {
     fi
 }
 
-# Sandbox for AI-assisted editing — code mounts + Claude state + nvim, NO forwarded ports.
+# Sandbox for AI-assisted editing — code mounts + AI agent state + nvim, NO forwarded ports.
 sandbox-code() {
     local name="sandbox-code"
     local state
@@ -93,9 +94,11 @@ sandbox-code() {
           --pids-limit=512 \
           --memory=4g \
           --cpus=10 \
-          --tmpfs /tmp:rw,noexec,nosuid,size=4g \
+          --tmpfs /tmp:rw,nosuid,size=4g \
           -v sandbox-claude:/home/sandbox/.claude \
           -v sandbox-codex:/home/sandbox/.codex \
+          -v sandbox-opencode-data:/home/sandbox/.local/share/opencode \
+          -v sandbox-opencode-config:/home/sandbox/.config/opencode \
           -v sandbox-nvim-share:/home/sandbox/.local/share/nvim \
           -v sandbox-nvim-state:/home/sandbox/.local/state/nvim \
           -v ~/.config/nvim:/home/sandbox/.config/nvim:ro,z \
@@ -122,11 +125,11 @@ Two sandboxes for two different jobs. Each is a separate container — you can h
 | Command | Mounts | Ports | Use for |
 | --- | --- | --- | --- |
 | `sandbox` | none | none | Throwaway scratch. Running unknown code with zero credential exposure. |
-| `sandbox-code` | `sandbox-claude` + `sandbox-codex` volumes + `~/Code` at `/workspace` + `~/.config/nvim` read-only | none | Reading/editing code with Claude Code or Codex CLI. |
+| `sandbox-code` | `sandbox-claude` + `sandbox-codex` + `sandbox-opencode-*` volumes + `~/Code` at `/workspace` + `~/.config/nvim` read-only | none | Reading/editing code with Claude Code, Codex CLI, or OpenCode. |
 
 ```bash
 sandbox          # enter the scratch sandbox
-sandbox-code     # enter the code+Claude sandbox
+sandbox-code     # enter the code+AI sandbox
 
 sandbox-stop     # stop all sandboxes (SIGKILL — instant)
 sandbox-nuke     # destroy all sandboxes (volumes survive)
@@ -143,6 +146,8 @@ only `podman volume rm <name>` wipes them.
 | --- | --- | --- | --- |
 | `sandbox-claude` | `/home/sandbox/.claude` | `sandbox-code` only | Claude Code auth, settings, skills, memory |
 | `sandbox-codex` | `/home/sandbox/.codex` | `sandbox-code` only | Codex CLI auth, config, sessions, memories, plus `~/.agents/` content via symlink |
+| `sandbox-opencode-data` | `/home/sandbox/.local/share/opencode` | `sandbox-code` only | OpenCode provider credentials, including `auth.json` |
+| `sandbox-opencode-config` | `/home/sandbox/.config/opencode` | `sandbox-code` only | OpenCode global config, including `opencode.json` and `tui.json` |
 
 The Dockerfile bakes two symlinks that redirect host-style paths into the
 named volumes so writes persist transparently:
@@ -155,11 +160,11 @@ named volumes so writes persist transparently:
   location read by Codex (and originally Claude). It physically lives
   inside the Codex volume, so a single volume holds everything Codex needs.
 
-First time you run `sandbox-code`, the volumes are empty — run `claude login`
-and `codex login` once and they're persisted from then on. Subsequent
+First time you run `sandbox-code`, the volumes are empty — run `claude login`,
+`codex login`, and `opencode` then `/connect` once and they're persisted from then on. Subsequent
 `sandbox-nuke` / `sandbox-rebuild` keeps you logged in.
 
-`sandbox` deliberately does NOT mount the Claude/Codex volumes — it has no
+`sandbox` deliberately does NOT mount the Claude/Codex/OpenCode volumes — it has no
 business with your credentials. Worms running in that container can't reach
 the token.
 
@@ -177,8 +182,12 @@ Each container runs with:
 - `--pids-limit=512` — limits fork bombs
 - `--memory=2g` (`sandbox`) or `4g` (`sandbox-code`) — caps memory
 - `--cpus=10` — caps CPU usage
-- `--tmpfs /tmp:rw,noexec,nosuid,size=4g` — `/tmp` is non-executable, blocks
-  the "drop payload, chmod +x, exec" pattern common in npm/Go worms
+- `sandbox` uses `--tmpfs /tmp:rw,noexec,nosuid,size=4g` — `/tmp` is
+  non-executable, blocking the "drop payload, chmod +x, exec" pattern common
+  in npm/Go worms
+- `sandbox-code` uses `--tmpfs /tmp:rw,nosuid,size=4g` — OpenCode needs an
+  executable temp directory during startup, so the noexec hardening is reserved
+  for the fully isolated scratch sandbox
 - `--init` — proper PID 1 reaps zombies (matters for long-lived sessions)
 - Non-root user (`sandbox`) inside the container
 - `~/.config/nvim` mounted read-only in `sandbox-code` — a compromised dep
