@@ -27,7 +27,7 @@ by isolating dependency execution from your host credentials.
 | fd             | fd-find                |
 | find           | findutils              |
 | ps/top         | procps-ng              |
-| Claude Code    | claude.ai/install.sh   |
+| Claude Code    | @anthropic-ai/claude-code (npm) |
 | Codex CLI      | @openai/codex (npm)    |
 | OpenCode       | opencode-ai (npm)      |
 | GitHub CLI     | gh                     |

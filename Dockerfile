@@ -64,9 +64,6 @@ RUN mkdir -p /home/sandbox/.claude \
     ln -s /home/sandbox/.claude/claude.json /home/sandbox/.claude.json && \
     ln -s /home/sandbox/.codex/agents       /home/sandbox/.agents
 
-# Install Claude Code as the sandbox user
-RUN curl -fsSL https://claude.ai/install.sh | bash
-
 # Set Go paths inside the container
 ENV GOPATH=/home/sandbox/go
 ENV PATH=$PATH:$GOPATH/bin
@@ -92,13 +89,10 @@ RUN npm install -g npm@latest
 # checksum-verified via GOSUMDB, so the supply-chain posture is unchanged.
 ENV GOTOOLCHAIN=auto
 
-# Codex CLI and OpenCode — installed alongside Claude. Codex state lives in
-# ~/.codex (sandbox-codex volume). OpenCode stores provider credentials under
+# Claude Code, Codex CLI, and OpenCode. State lives in separate volumes mounted
+# only in sandbox-code. OpenCode stores provider credentials under
 # ~/.local/share/opencode/auth.json and global config under ~/.config/opencode.
-# Those volumes are mounted only in sandbox-code (same trust model as Claude).
-RUN npm install -g @openai/codex
-
-RUN npm install -g opencode-ai
+RUN npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai
 
 # Go-based LSPs, formatters, linter, debugger.
 # `go install` has no min-release-age equivalent, but GOSUMDB (sum.golang.org)
