@@ -77,11 +77,9 @@ ENV NPM_CONFIG_PREFIX=/home/sandbox/.local
 # Override per-command with `npm install --min-release-age=0 <pkg>` when needed.
 ENV NPM_CONFIG_MIN_RELEASE_AGE=3
 
-# Fedora 44 ships npm 11.8.0, but `min-release-age` only exists in npm ≥ 11.10.0.
-# Self-upgrade npm into NPM_CONFIG_PREFIX so the cooldown actually takes effect.
-# The bootstrap install runs as the old npm 11.8.0 (which ignores the env var),
-# so the upgrade itself can't be blocked by the cooldown.
-RUN npm install -g npm@latest
+# Upgrade npm so min-release-age (npm >= 11.10) is honored by later installs.
+# Fall back to 11.x when @latest outruns Fedora's node (npm 12 needs node 24.15+).
+RUN npm install -g npm@latest || npm install -g npm@11
 
 # Fedora pins GOTOOLCHAIN=local, but tools like gopls may require a newer Go
 # than the distro package (e.g. gopls v0.22 needs go >= 1.26 vs Fedora's 1.25).
