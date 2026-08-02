@@ -97,7 +97,8 @@ ENV GOTOOLCHAIN=auto
 # Claude Code, Codex CLI, and OpenCode. State lives in separate volumes mounted
 # only in sandbox-code. OpenCode stores provider credentials under
 # ~/.local/share/opencode/auth.json and global config under ~/.config/opencode.
-RUN npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai
+RUN npm install -g --allow-scripts=@anthropic-ai/claude-code,@openai/codex,opencode-ai \
+        @anthropic-ai/claude-code @openai/codex opencode-ai
 
 # Go-based LSPs, formatters, linter, debugger.
 # `go install` has no min-release-age equivalent, but GOSUMDB (sum.golang.org)
