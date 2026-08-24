@@ -17,6 +17,8 @@ by isolating dependency execution from your host credentials.
 | SSH            | openssh-clients        |
 | GPG            | gnupg2                 |
 | OpenSSL        | openssl                |
+| SoftHSM 2      | softhsm                |
+| PKCS#11 tools  | opensc                 |
 | curl           | curl                   |
 | wget           | wget                   |
 | Neovim         | neovim                 |
@@ -46,6 +48,32 @@ podman build \
   --build-arg GROUP_ID=$(id -g) \
   -t sandbox .
 ```
+
+## SoftHSM testing
+
+The image uses SoftHSM's default configuration and token directory.
+
+Initialize a token in each new container:
+
+```bash
+softhsm2-util \
+  --init-token \
+  --free \
+  --label "hsm-doctor-test" \
+  --so-pin 12345678 \
+  --pin 123456
+```
+
+Inspect the token through SoftHSM and OpenSC:
+
+```bash
+softhsm2-util --show-slots
+pkcs11-tool --module /usr/lib64/pkcs11/libsofthsm2.so --list-slots
+```
+
+Use `/usr/lib64/pkcs11/libsofthsm2.so` as the Cryptoki library path in HSM Doctor.
+
+Use `123456` as the test token PIN. The token data disappears when `sandbox-nuke` removes the container.
 
 ## Shell aliases
 

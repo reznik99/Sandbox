@@ -15,6 +15,8 @@ RUN dnf upgrade -y --refresh && \
         # Utilities
         openssh-clients git fzf lsd gnupg2 \
         openssl curl wget vim findutils procps-ng ripgrep \
+        # Software PKCS#11 provider and diagnostic CLI
+        softhsm opensc \
         # Caruso work: GitHub CLI, JSON wrangling, protoc compiler
         # (codegen plugins are installed via `go install` below).
         gh jq protobuf-compiler \
@@ -47,7 +49,8 @@ ENV PATH="/usr/local/go/bin:/usr/local/node/bin:${PATH}"
 
 # Create group and user matching the host IDs
 RUN groupadd -g $GROUP_ID sandbox && \
-    useradd -u $USER_ID -g $GROUP_ID -m -s /bin/bash sandbox
+    useradd -u $USER_ID -g $GROUP_ID -m -s /bin/bash sandbox && \
+    usermod -aG ods sandbox
 
 # Ensure the sandbox user owns their home
 COPY --chown=sandbox:sandbox bashrc /home/sandbox/.bashrc
