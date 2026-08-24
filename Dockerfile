@@ -4,15 +4,13 @@ FROM fedora:latest
 ARG USER_ID=1000
 ARG GROUP_ID=1000
 
+# Go and Node come from upstream tarballs below, not dnf: Fedora's `golang` is
+# built with GOEXPERIMENT=nodwarf5, which breaks GOTOOLCHAIN=auto switching.
 RUN dnf upgrade -y --refresh && \
     dnf install -y \
-        # Core Dev Tools
-        nodejs24 nodejs24-npm golang \
-        # Build Tools (Optional but recommended for CGO/Native modules)
+        # Build Tools
         gcc gcc-c++ make \
-        # Editor: LazyVim reads its config from /home/sandbox/.config/nvim
-        # (bind-mounted from host). Plugins live in named volumes so they
-        # survive sandbox-nuke. See `Persistent state` in README.
+        # LazyVim config bind-mounted from host; plugins in named volumes.
         neovim fd-find \
         # Utilities
         openssh-clients git fzf lsd gnupg2 \
@@ -24,10 +22,28 @@ RUN dnf upgrade -y --refresh && \
         bubblewrap \
         && \
     dnf clean all && \
-    rm -rf /var/cache/dnf && \
-    ln -s /usr/bin/node-24 /usr/local/bin/node && \
-    ln -s /usr/bin/npm-24 /usr/local/bin/npm && \
-    ln -s /usr/bin/npx-24 /usr/local/bin/npx
+    rm -rf /var/cache/dnf
+
+# Go — stock upstream toolchain (no LTS; latest stable patch). SHA-256 per go.dev/dl.
+# linux-arm64 build: this branch targets Apple Silicon hosts.
+ARG GO_VERSION=1.26.4
+ARG GO_SHA256=ef758ae7c6cf9267c9c0ef080b8965f453d89ab2d25d9eb22de4405925238768
+RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-arm64.tar.gz" -o /tmp/go.tgz && \
+    echo "${GO_SHA256}  /tmp/go.tgz" | sha256sum -c - && \
+    tar -C /usr/local -xzf /tmp/go.tgz && \
+    rm /tmp/go.tgz
+
+# Node — v24 (Krypton) Active LTS. SHA-256 per nodejs.org/dist.
+# linux-arm64 build: this branch targets Apple Silicon hosts.
+ARG NODE_VERSION=24.17.0
+ARG NODE_SHA256=faa0d59ba7fe7045c950ed09b190578fb8eee73e4358686d38fcc99ca58c1480
+RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-arm64.tar.gz" -o /tmp/node.tgz && \
+    echo "${NODE_SHA256}  /tmp/node.tgz" | sha256sum -c - && \
+    mkdir -p /usr/local/node && \
+    tar -C /usr/local/node --strip-components=1 -xzf /tmp/node.tgz && \
+    rm /tmp/node.tgz
+
+ENV PATH="/usr/local/go/bin:/usr/local/node/bin:${PATH}"
 
 # Create group and user matching the host IDs
 RUN groupadd -g $GROUP_ID sandbox && \
@@ -81,16 +97,14 @@ ENV NPM_CONFIG_MIN_RELEASE_AGE=3
 # Fall back to 11.x when @latest outruns Fedora's node (npm 12 needs node 24.15+).
 RUN npm install -g npm@latest || npm install -g npm@11
 
-# Fedora pins GOTOOLCHAIN=local, but tools like gopls may require a newer Go
-# than the distro package (e.g. gopls v0.22 needs go >= 1.26 vs Fedora's 1.25).
-# `auto` lets `go install` fetch the required toolchain on demand — still
-# checksum-verified via GOSUMDB, so the supply-chain posture is unchanged.
+# Let `go install` / go.mod fetch newer toolchains on demand, checksum-verified via GOSUMDB.
 ENV GOTOOLCHAIN=auto
 
 # Claude Code, Codex CLI, and OpenCode. State lives in separate volumes mounted
 # only in sandbox-code. OpenCode stores provider credentials under
 # ~/.local/share/opencode/auth.json and global config under ~/.config/opencode.
-RUN npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai
+RUN npm install -g --allow-scripts=@anthropic-ai/claude-code,@openai/codex,opencode-ai \
+        @anthropic-ai/claude-code @openai/codex opencode-ai
 
 # Go-based LSPs, formatters, linter, debugger.
 # `go install` has no min-release-age equivalent, but GOSUMDB (sum.golang.org)

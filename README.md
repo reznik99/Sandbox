@@ -7,11 +7,11 @@ by isolating dependency execution from your host credentials.
 
 ## Included tools
 
-| Tool           | Package                |
-| -------------- | ---------------------- |
-| Node.js 24     | nodejs24, nodejs24-npm |
-| Go             | golang                 |
-| GCC/G++        | gcc, gcc-c++           |
+| Tool           | Source                          |
+| -------------- | ------------------------------- |
+| Node.js 24 LTS | nodejs.org (tarball)            |
+| Go             | go.dev (tarball)                |
+| GCC/G++        | gcc, gcc-c++                    |
 | Make           | make                   |
 | Git            | git                    |
 | SSH            | openssh-clients        |
@@ -74,7 +74,7 @@ sandbox() {
           --pids-limit=512 \
           --memory=2g \
           --cpus=10 \
-          --tmpfs /tmp:rw,noexec,nosuid,size=512m \
+          --tmpfs /tmp:rw,noexec,nosuid,size=4g \
           localhost/sandbox sleep infinity
         podman exec -it "$name" bash
     fi
@@ -101,7 +101,7 @@ sandbox-code() {
           --pids-limit=512 \
           --memory=4g \
           --cpus=10 \
-          --tmpfs /tmp:rw,nosuid,size=512m \
+          --tmpfs /tmp:rw,nosuid,size=4g \
           -v sandbox-claude:/home/sandbox/.claude \
           -v sandbox-codex:/home/sandbox/.codex \
           -v sandbox-opencode-data:/home/sandbox/.local/share/opencode \
@@ -189,10 +189,10 @@ Each container runs with:
 - `--pids-limit=512` — limits fork bombs
 - `--memory=2g` (`sandbox`) or `4g` (`sandbox-code`) — caps memory
 - `--cpus=10` — caps CPU usage
-- `sandbox` uses `--tmpfs /tmp:rw,noexec,nosuid,size=512m` — `/tmp` is
+- `sandbox` uses `--tmpfs /tmp:rw,noexec,nosuid,size=4g` — `/tmp` is
   non-executable, blocking the "drop payload, chmod +x, exec" pattern common
   in npm/Go worms
-- `sandbox-code` uses `--tmpfs /tmp:rw,nosuid,size=512m` — OpenCode needs an
+- `sandbox-code` uses `--tmpfs /tmp:rw,nosuid,size=4g` — OpenCode needs an
   executable temp directory during startup, so the noexec hardening is reserved
   for the fully isolated scratch sandbox
 - `--init` — proper PID 1 reaps zombies (matters for long-lived sessions)
@@ -210,5 +210,5 @@ The image also bakes in defenses against npm supply-chain attacks:
   style) are detected and yanked within hours, so the cooldown skips over
   them entirely. Override per command with `npm install --min-release-age=0 <pkg>`
   when you actually need a freshly published version.
-- npm is self-upgraded to ≥ 11.10.0 during build (Fedora ships 11.8.0, which
-  predates the `min-release-age` setting).
+- npm is self-upgraded to the latest release during build, keeping it ahead
+  of the version bundled with Node.
