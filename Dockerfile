@@ -22,21 +22,21 @@ RUN dnf upgrade -y --refresh && \
     rm -rf /var/cache/dnf
 
 # Go — stock upstream toolchain (no LTS; latest stable patch). SHA-256 per go.dev/dl.
-ARG GO_VERSION=1.26.4
-ARG GO_SHA256=1153d3d50e0ac764b447adfe05c2bcf08e889d42a02e0fe0259bd47f6733ad7f
+ARG GO_VERSION=1.27.1
+ARG GO_SHA256=63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445
 RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz && \
     echo "${GO_SHA256}  /tmp/go.tgz" | sha256sum -c - && \
     tar -C /usr/local -xzf /tmp/go.tgz && \
     rm /tmp/go.tgz
 
 # Node — v24 (Krypton) Active LTS. SHA-256 per nodejs.org/dist.
-ARG NODE_VERSION=24.17.0
-ARG NODE_SHA256=e0472427aa791ad80bdc426ff7cc73cdd28ed0f616d1ff9689a23a7f47f1265f
-RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz" -o /tmp/node.tgz && \
-    echo "${NODE_SHA256}  /tmp/node.tgz" | sha256sum -c - && \
+ARG NODE_VERSION=24.21.0
+ARG NODE_SHA256=fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6
+RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz && \
+    echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c - && \
     mkdir -p /usr/local/node && \
-    tar -C /usr/local/node --strip-components=1 -xzf /tmp/node.tgz && \
-    rm /tmp/node.tgz
+    tar -C /usr/local/node --strip-components=1 -xf /tmp/node.tar.xz && \
+    rm /tmp/node.tar.xz
 
 ENV PATH="/usr/local/go/bin:/usr/local/node/bin:${PATH}"
 
